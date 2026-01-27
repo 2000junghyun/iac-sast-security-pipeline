@@ -1,0 +1,4 @@
+include:
+  - project: platform-engineering/gitlab-ci-templates
+    ref: main
+    file: terraform/ci-entrypoint.yml

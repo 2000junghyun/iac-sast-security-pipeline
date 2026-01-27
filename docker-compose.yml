@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  trivy-tf-scanner-v3:
+    build: .
+    image: trivy-tf-scanner-v3
+    container_name: trivy-tf-scanner-v3
+    networks:
+      - gitlab-net
+    ports:
+      - "9093:9093"  # 호스트:컨테이너
+    environment:
+      # Docker 네트워크 내에서 GitLab 컨테이너 이름으로 접근
+      - GITLAB_URL=http://gitlab-30
+      - GITLAB_TOKENS=${GITLAB_TOKENS}
+      - WEBHOOK_SECRET=${WEBHOOK_SECRET}
+      - SERVER_PORT=9093
+      - STORAGE_PATH=/app/storage
+    volumes:
+      # 다운로드된 파일을 호스트에 마운트
+      - ./storage-v3:/app/storage
+      # 스캔 결과를 호스트에 마운트
+      - ./scan-results-v3:/app/scan-results
+    restart: unless-stopped
+    # GitLab과 같은 네트워크에서 trivy-tf-scanner-v3 이름으로 접근 가능
+
+networks:
+  gitlab-net:
+    external: true  # 기존 gitlab-net 네트워크 사용
