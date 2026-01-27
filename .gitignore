@@ -1,0 +1,37 @@
+# Binaries
+bin/trivy
+bin/trivy-parser
+bin/trivy-*
+bin/*.exe
+
+# Runtime directories
+storage/
+scan-results/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build output
+trivy-tf-scanner
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+vendor/
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

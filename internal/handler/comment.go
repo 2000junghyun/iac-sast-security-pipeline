@@ -1,4 +1,4 @@
-package trivy_scanner
+package handler
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"trivy-tf-scanner/pkg/gitlab"
+	"trivy-tf-scanner/internal/gitlab"
 )
 
 // Excel 다운로드 링크를 MR에 댓글로 작성하는 핸들러

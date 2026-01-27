@@ -4,10 +4,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	trivyScanner "trivy-tf-scanner/internal/handler/trivy-scanner"
-	"trivy-tf-scanner/pkg/analyzer/scanner"
+
+	"trivy-tf-scanner/internal/gitlab"
+	"trivy-tf-scanner/internal/handler"
+	"trivy-tf-scanner/internal/scanner"
 	"trivy-tf-scanner/pkg/config"
-	"trivy-tf-scanner/pkg/gitlab"
 
 	"github.com/joho/godotenv"
 )
@@ -32,10 +33,10 @@ func main() {
 
 	// Trivy Scanner 초기화
 	scannerInstance := scanner.NewScanner(
-		"./trivy",           // Trivy 실행 파일 경로
-		"./trivy-parser",    // Trivy-parser 실행 파일 경로
-		"./custom-policies", // Custom policies 디렉토리
-		"./scan-results",    // 스캔 결과 저장 경로
+		"./bin/trivy",           // Trivy 실행 파일 경로
+		"./bin/trivy-parser",    // Trivy-parser 실행 파일 경로
+		"./custom-policies",     // Custom policies 디렉토리
+		"./scan-results",        // 스캔 결과 저장 경로
 	)
 
 	// Scanner 설정 검증
@@ -82,7 +83,7 @@ func main() {
 
 	// Path Upload 핸들러 (Token 필요)
 	if hasToken {
-		pathUploadHandler := trivyScanner.NewPathUploadHandler(
+		pathUploadHandler := handler.NewPathUploadHandler(
 			cfg.WebhookSecret,
 			cfg.StoragePath,
 			gitlabClient,
@@ -95,13 +96,13 @@ func main() {
 	}
 
 	// Scan Results Download 핸들러
-	downloadResultsHandler := trivyScanner.NewDownloadResultsHandler("./scan-results")
+	downloadResultsHandler := handler.NewDownloadResultsHandler("./scan-results")
 	http.Handle("/api/scan-results", downloadResultsHandler)
 	log.Println("✓ Scan results download handler registered: GET /api/scan-results")
 
 	// Post URL 핸들러 (Token 필요)
 	if hasToken {
-		postURLHandler := trivyScanner.NewPostURLHandler(
+		postURLHandler := handler.NewPostURLHandler(
 			cfg.WebhookSecret,
 			gitlabClient,
 		)

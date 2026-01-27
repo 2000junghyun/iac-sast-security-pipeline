@@ -1,4 +1,4 @@
-package trivy_scanner
+package handler
 
 import (
 	"encoding/json"
@@ -7,8 +7,9 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"trivy-tf-scanner/pkg/analyzer/scanner"
-	"trivy-tf-scanner/pkg/gitlab"
+
+	"trivy-tf-scanner/internal/gitlab"
+	"trivy-tf-scanner/internal/scanner"
 )
 
 // 파일 경로만 받아서 GitLab에서 다운로드하는 구조체

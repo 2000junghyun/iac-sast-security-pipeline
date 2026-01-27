@@ -1,4 +1,4 @@
-package trivy_scanner
+package handler
 
 import (
 	"fmt"
