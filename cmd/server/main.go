@@ -8,7 +8,7 @@ import (
 	"trivy-tf-scanner/internal/gitlab"
 	"trivy-tf-scanner/internal/handler"
 	"trivy-tf-scanner/internal/scanner"
-	"trivy-tf-scanner/pkg/config"
+	"trivy-tf-scanner/internal/config"
 
 	"github.com/joho/godotenv"
 )
@@ -33,10 +33,11 @@ func main() {
 
 	// Trivy Scanner 초기화
 	scannerInstance := scanner.NewScanner(
-		"./bin/trivy",           // Trivy 실행 파일 경로
-		"./bin/trivy-parser",    // Trivy-parser 실행 파일 경로
-		"./custom-policies",     // Custom policies 디렉토리
-		"./scan-results",        // 스캔 결과 저장 경로
+		cfg.TrivyBinPath,
+		cfg.ParserBinPath,
+		cfg.CustomPoliciesPath,
+		cfg.StoragePath,
+		cfg.ScanResultsPath,
 	)
 
 	// Scanner 설정 검증
@@ -81,35 +82,35 @@ func main() {
 	})
 	log.Println("✓ Root handler registered: GET /")
 
-	// Path Upload 핸들러 (Token 필요)
+	// Scan 핸들러 (Token 필요)
 	if hasToken {
-		pathUploadHandler := handler.NewPathUploadHandler(
+		scanHandler := handler.NewScanHandler(
 			cfg.WebhookSecret,
 			cfg.StoragePath,
 			gitlabClient,
 			scannerInstance,
 		)
-		http.Handle("/api/upload-paths", pathUploadHandler)
-		log.Println("✓ Path upload handler registered: POST /api/upload-paths")
+		http.Handle("/api/scan", scanHandler)
+		log.Println("✓ Scan handler registered: POST /api/scan")
 	} else {
-		log.Println("⚠️  Path upload handler NOT registered (requires GitLab token)")
+		log.Println("⚠️  Scan handler NOT registered (requires GitLab token)")
 	}
 
-	// Scan Results Download 핸들러
-	downloadResultsHandler := handler.NewDownloadResultsHandler("./scan-results")
-	http.Handle("/api/scan-results", downloadResultsHandler)
-	log.Println("✓ Scan results download handler registered: GET /api/scan-results")
+	// Scan Results 핸들러
+	scanResultsHandler := handler.NewScanResultsHandler(cfg.ScanResultsPath)
+	http.Handle("/api/scan-results", scanResultsHandler)
+	log.Println("✓ Scan results handler registered: GET /api/scan-results")
 
-	// Post URL 핸들러 (Token 필요)
+	// Download Link 핸들러 (Token 필요)
 	if hasToken {
-		postURLHandler := handler.NewPostURLHandler(
+		downloadLinkHandler := handler.NewDownloadLinkHandler(
 			cfg.WebhookSecret,
 			gitlabClient,
 		)
-		http.Handle("/api/post-comment", postURLHandler)
-		log.Println("✓ Post URL handler registered: POST /api/post-comment")
+		http.Handle("/api/download-link", downloadLinkHandler)
+		log.Println("✓ Download link handler registered: POST /api/download-link")
 	} else {
-		log.Println("⚠️  Post URL handler NOT registered (requires GitLab token)")
+		log.Println("⚠️  Download link handler NOT registered (requires GitLab token)")
 	}
 
 	// 서버 시작
@@ -121,11 +122,11 @@ func main() {
 	log.Println("  GET  /               - Service info")
 	log.Println("  GET  /health         - Health check")
 	if hasToken {
-		log.Println("  POST /api/upload-paths - Path upload")
+		log.Println("  POST /api/scan         - Security scan")
 	}
 	log.Println("  GET  /api/scan-results - Download scan results (Excel)")
 	if hasToken {
-		log.Println("  POST /api/post-comment - Post download link comment")
+		log.Println("  POST /api/download-link - Post download link comment")
 	}
 	log.Println("---")
 	log.Println()
