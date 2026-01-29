@@ -1,3 +1,4 @@
+# METADATA
 # title: API Gateway 캐시는 활성화 시 암호화 필요
 # description: |
 #   API Gateway 스테이지에서 메서드에 대한 캐싱이 활성화된 경우 캐시 데이터는 암호화되어야 합니다.
