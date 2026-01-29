@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"trivy-tf-scanner/internal/report"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/report"
 )
 
 func main() {

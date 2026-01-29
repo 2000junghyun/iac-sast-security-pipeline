@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"trivy-tf-scanner/internal/gitlab"
-	"trivy-tf-scanner/internal/report"
-	"trivy-tf-scanner/internal/scanner"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/gitlab"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/report"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/scanner"
 )
 
 // ScanRequest는 스캔 요청 구조체

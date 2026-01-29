@@ -1,4 +1,4 @@
-module trivy-tf-scanner
+module github.com/2000junghyun/iac-sast-security-pipeline
 
 go 1.21
 

@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"os"
 
-	"trivy-tf-scanner/internal/config"
-	"trivy-tf-scanner/internal/gitlab"
-	"trivy-tf-scanner/internal/handler"
-	"trivy-tf-scanner/internal/scanner"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/config"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/gitlab"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/handler"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/scanner"
 
 	"github.com/joho/godotenv"
 )

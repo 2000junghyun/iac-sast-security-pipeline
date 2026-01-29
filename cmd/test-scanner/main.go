@@ -5,7 +5,7 @@ import (
 	"log"
 	"os"
 
-	"trivy-tf-scanner/internal/scanner"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/scanner"
 )
 
 func main() {

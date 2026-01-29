@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"trivy-tf-scanner/internal/gitlab"
+	"github.com/2000junghyun/iac-sast-security-pipeline/internal/gitlab"
 )
 
 // DownloadLinkRequest는 다운로드 링크 댓글 작성 요청 구조체
