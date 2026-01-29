@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 )
 
 // Scanner는 Trivy 스캔 워크플로우를 오케스트레이션
@@ -105,37 +106,42 @@ func CheckVulnerabilitiesInOriginal(filePath string) (bool, error) {
 		return false, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	// Trivy 결과에서 "Results" 배열이 비어있지 않은지 확인
-	// 간단한 문자열 검색으로 판단 (JSON 파싱 없이)
 	content := string(data)
 
-	// "Results":[] 또는 "Results": [] 패턴 확인
+	// "Misconfigurations": [] 패턴 확인 (JSON 파싱 없이 문자열 검색)
 	if len(content) < 50 {
 		// 파일이 너무 작으면 빈 결과로 판단
 		return false, nil
 	}
 
 	// "Misconfigurations" 또는 "Results" 키워드가 있고 내용이 있는지 확인
-	hasMisconfigurations := false
-	hasResults := false
 
-	// 간단한 휴리스틱: "Misconfigurations"가 있고 그 뒤에 내용이 있는지
-	for i := 0; i < len(content)-20; i++ {
-		if content[i:i+18] == `"Misconfigurations"` {
-			hasMisconfigurations = true
-			// "Misconfigurations":[ 다음에 ] 바로 오지 않으면 내용이 있음
-			remaining := content[i+18:]
-			for j := 0; j < len(remaining)-1; j++ {
-				if remaining[j] == '[' {
-					if j+1 < len(remaining) && remaining[j+1] != ']' {
-						hasResults = true
-					}
-					break
-				}
-			}
-			break
-		}
+	// "Misconfigurations": [ 패턴을 찾아서 빈 배열인지 확인
+	searchStr := `"Misconfigurations"`
+	idx := strings.Index(content, searchStr)
+
+	if idx == -1 {
+		// "Misconfigurations" 키워드가 없으면 취약점 없음
+		return false, nil
 	}
 
-	return hasMisconfigurations && hasResults, nil
+	// "Misconfigurations" 이후 첫 번째 [ 찾기
+	remaining := content[idx+len(searchStr):]
+	bracketIdx := strings.IndexByte(remaining, '[')
+
+	if bracketIdx == -1 {
+		return false, nil
+	}
+
+	// [ 이후 공백을 건너뛰고 ] 가 바로 오는지 확인
+	afterBracket := remaining[bracketIdx+1:]
+	trimmed := strings.TrimLeft(afterBracket, " \t\n\r")
+
+	// 빈 배열 "Misconfigurations": [] 이면 취약점 없음
+	if len(trimmed) > 0 && trimmed[0] == ']' {
+		return false, nil
+	}
+
+	// 빈 배열이 아니면 취약점 있음
+	return true, nil
 }
