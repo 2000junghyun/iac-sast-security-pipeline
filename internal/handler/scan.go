@@ -68,10 +68,12 @@ func (h *ScanHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		scanResult = h.executeScan(req, downloadResult.SuccessfulFiles)
 	}
 
-	// 4. MR에 스캔 결과 댓글 작성
+	// 4. MR에 스캔 결과 댓글 작성 + 스캔 실패 시 알림 댓글 작성
 	if scanResult != nil {
 		comment := h.buildScanComment(scanResult)
 		h.postScanComment(req, comment)
+	} else if len(downloadResult.SuccessfulFiles) > 0 {
+		h.postScanComment(req, "⚠️ 보안 스캔에 실패했습니다. 관리자에게 문의해주세요.")
 	}
 
 	// 5. 불필요 파일 정리
