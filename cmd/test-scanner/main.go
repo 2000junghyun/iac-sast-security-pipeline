@@ -9,8 +9,6 @@ import (
 )
 
 func main() {
-	fmt.Println("🧪 Scanner 통합 테스트\n")
-
 	// Scanner 인스턴스 생성 및 검증
 	scannerInstance := scanner.NewScanner(
 		"./bin/trivy",
