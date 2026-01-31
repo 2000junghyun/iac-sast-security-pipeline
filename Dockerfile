@@ -12,7 +12,7 @@ RUN sed -i 's/https/http/g' /etc/apk/repositories && \
 COPY . .
 
 # 바이너리 빌드 (vendor 사용)
-RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -o trivy-tf-scanner ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=vendor -o iac-scanner ./cmd/server
 
 # 실행 스테이지
 FROM alpine:latest
@@ -34,10 +34,10 @@ RUN wget --no-check-certificate https://github.com/aquasecurity/trivy/releases/d
     rm trivy_0.58.1_Linux-64bit.tar.gz
 
 # 빌드된 바이너리 복사
-COPY --from=builder /app/trivy-tf-scanner .
+COPY --from=builder /app/iac-scanner .
 
-# trivy-parser 실행 파일 복사 (Linux 버전을 bin/trivy-parser로 이름 변경)
-COPY trivy-parser-linux ./bin/trivy-parser
+# trivy-parser 실행 파일 복사
+COPY bin/trivy-parser ./bin/trivy-parser
 RUN chmod +x /app/bin/trivy-parser
 
 # Custom policies 복사
@@ -47,7 +47,7 @@ COPY custom-policies ./custom-policies
 RUN mkdir -p /app/storage /app/scan-results
 
 # 포트 노출
-EXPOSE 9093
+EXPOSE 8080
 
 # 실행
-CMD ["./trivy-tf-scanner"]
+CMD ["./iac-scanner"]
