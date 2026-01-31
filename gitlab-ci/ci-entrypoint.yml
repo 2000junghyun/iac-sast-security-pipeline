@@ -5,12 +5,12 @@ workflow:
     - when: never
 
 variables:
-  SCANNER_HOST: "http://trivy-tf-scanner-v3:9093"
+  SCANNER_HOST: "http://iac-scanner:8080"
 
 stages:
   - scan
 
-tf_vulnerability_scan:
+iac_security_scan:
   image: alpine:latest
   tags:
     - docker
@@ -26,23 +26,27 @@ tf_vulnerability_scan:
     
     # 타겟 브랜치 fetch
     - git fetch origin $CI_MERGE_REQUEST_TARGET_BRANCH_NAME:$CI_MERGE_REQUEST_TARGET_BRANCH_NAME
-    
-    # 1. 변경된 .tf 파일 경로 수집
+
+    # 1. 변경된 terraform 파일 경로 수집
     - |
-      echo "Retrieving changed .tf files..."
+      echo "#1 Retrieving changed terraform files"
+
       changed_files=$(git diff --name-only --diff-filter=AM \
         $CI_MERGE_REQUEST_TARGET_BRANCH_NAME...HEAD \
         | grep -E '\.tf$' || true)
-      
-      echo "Changed .tf files:"
+
+      echo "✓ Changed terraform files:"
       echo "$changed_files"
     
-      # JSON 배열로 변환
+      # .tf 파일 변경이 없으면 스캔 건너뛰기
       if [ -z "$changed_files" ]; then
-        files_array="[]"
-      else
-        files_array=$(echo "$changed_files" | jq -R . | jq -s .)
+        echo "✓ No .tf files changed in this MR"
+        echo "✓ Skipping IaC security scan"
+        exit 0
       fi
+    
+      # JSON 배열로 변환
+      files_array=$(echo "$changed_files" | jq -R . | jq -s .)
     
       # 전체 페이로드 생성
       payload=$(jq -n \
@@ -60,36 +64,33 @@ tf_vulnerability_scan:
           mr_title: $mr_title,
           file_paths: $file_paths
         }')
-      
-      echo "Generated payload:"
-      echo "$payload" | jq .
     
-    # 2. trivy-tf-scanner API로 전송
+    # 2. IaC Scanner API로 전송
     - |
-      echo "Sending to trivy-tf-scanner API..."
+      echo "#2 Sending to IaC Scanner API"
+
       response=$(curl -s -w "\n%{http_code}" \
         -X POST \
         -H "Content-Type: application/json" \
-        -H "X-API-Secret: $TRIVY_TF_SCANNER_SECRET" \
+        -H "X-API-Secret: $IAC_SCANNER_SECRET" \
         -d "$payload" \
-        "${SCANNER_HOST}/api/upload-paths")
+        "${SCANNER_HOST}/api/scan")
       
       http_code=$(echo "$response" | tail -n1)
       body=$(echo "$response" | sed '$d')
       
-      echo "HTTP Status: $http_code"
-      echo "Response: $body"
+      echo "✓ HTTP Status: $http_code"
+      echo "✓ Response: $body"
       
       if [ "$http_code" != "200" ]; then
-        echo "Failed to send payload to trivy-tf-scanner API"
+        echo "⚠️ Failed to send payload to IaC Scanner API"
         exit 1
       fi
-      
-      echo "Successfully sent terraform file paths to trivy-tf-scanner API"
     
     # 3. 스캔 완료 확인 (5초에 한 번씩 polling, 최대 60초)
     - |
-      echo "Waiting for scan to complete..."
+      echo "#3 Waiting for scan to complete"
+
       project_name=$(echo "$CI_PROJECT_PATH" | awk -F'/' '{print $NF}')
       max_wait=60
       waited=0
@@ -113,14 +114,15 @@ tf_vulnerability_scan:
       done
       
       if [ "$file_ready" = "false" ]; then
-        echo "⚠️  Excel file not ready after ${max_wait}s"
+        echo "⚠️ Excel file not ready after ${max_wait}s"
         echo "This is expected if no .tf files were changed"
         exit 0
       fi
     
     # 4. 서버에서 Excel 파일 다운로드
     - |
-      echo "Downloading Excel file from trivy-tf-scanner API..."
+      echo "#4 Downloading Excel file from IaC Scanner API"
+
       excel_filename="${project_name}_#${CI_MERGE_REQUEST_IID}.xlsx"
       response_code=$(curl -s -w "%{http_code}" \
         -o "${excel_filename}" \
@@ -131,20 +133,21 @@ tf_vulnerability_scan:
         echo "File info:"
         ls -lah "${excel_filename}"
       else
-        echo "⚠️  Failed to download Excel file (HTTP $response_code)"
+        echo "⚠️ Failed to download Excel file (HTTP $response_code)"
         exit 1
       fi
     
     # 5. Excel 다운로드 성공 후 댓글 작성 (다운로드 링크 포함) -> 두 번째 댓글
     - |
-      echo "Posting download link comment to MR..."
+      echo "#5 Posting download link comment to MR"
       
       # 파일명을 URL 인코딩 (# → %23)
       excel_filename_encoded=$(echo "${excel_filename}" | sed 's/#/%23/g')
       
-      # Artifacts URL 생성 (localhost:3080 사용)
-      # artifacts_url="${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/${excel_filename_encoded}"
-      artifacts_url="http://localhost:3080/${CI_PROJECT_PATH}/-/jobs/${CI_JOB_ID}/artifacts/file/${excel_filename_encoded}"
+      # Artifacts URL 생성
+      # CI/CD 변수 사용 (GitLab이 자동으로 제공)
+      # artifacts_url="http://localhost/${CI_PROJECT_PATH}/-/jobs/${CI_JOB_ID}/artifacts/file/${excel_filename_encoded}"
+      artifacts_url="${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/${excel_filename_encoded}"
       
       # 댓글 작성 페이로드 생성
       comment_payload=$(jq -n \
@@ -163,9 +166,9 @@ tf_vulnerability_scan:
       comment_response=$(curl -s -w "\n%{http_code}" \
         -X POST \
         -H "Content-Type: application/json" \
-        -H "X-API-Secret: $TRIVY_TF_SCANNER_SECRET" \
+        -H "X-API-Secret: $IAC_SCANNER_SECRET" \
         -d "$comment_payload" \
-        "${SCANNER_HOST}/api/post-comment")
+        "${SCANNER_HOST}/api/download-link")
       
       comment_http_code=$(echo "$comment_response" | tail -n1)
       comment_body=$(echo "$comment_response" | sed '$d')
@@ -176,8 +179,8 @@ tf_vulnerability_scan:
         echo "⚠️  Failed to post comment (HTTP $comment_http_code)"
       fi
   artifacts:
-    name: "trivy-scan-mr-$CI_MERGE_REQUEST_IID"
+    name: "iac-scan-mr-$CI_MERGE_REQUEST_IID"
     paths:
-      - "*.xlsx"                    # Excel 파일만 업로드
-    expire_in: 30 days              # 30일 후 자동 삭제
-    when: always                    # 성공/실패 관계없이 업로드
+      - "*.xlsx"
+    expire_in: 30 days
+    when: always
