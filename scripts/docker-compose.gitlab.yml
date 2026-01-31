@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # GitLab Community Edition 서버
+  gitlab:
+    image: gitlab/gitlab-ce:latest
+    container_name: local-gitlab
+    hostname: local-gitlab
+    restart: unless-stopped
+    
+    # 네트워크 설정
+    networks:
+      - gitlab-net
+    
+    # 포트 매핑
+    ports:
+      - "80:80"       # HTTP 웹 UI
+      - "443:443"     # HTTPS (선택사항)
+      - "2222:22"     # SSH for Git (호스트의 22번 포트 충돌 회피)
+    
+    # 환경 설정
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        # 외부 접근 URL (Docker 네트워크 내부에서 접근용)
+        external_url 'http://local-gitlab'
+        
+        # SSH 포트 설정 (2222로 노출)
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        
+        # 초기 root 패스워드 (선택사항 - 주석 해제하여 사용)
+        gitlab_rails['initial_root_password'] = 'ChangeMe123!'
+        
+        # 성능 최적화 (개발 환경용)
+        puma['worker_processes'] = 2
+        sidekiq['max_concurrency'] = 10
+        
+        # 메모리 사용 최적화
+        postgresql['shared_buffers'] = "256MB"
+        
+        # 타임존 설정
+        gitlab_rails['time_zone'] = 'Asia/Seoul'
+    
+    # 볼륨 마운트 (데이터 영속화)
+    volumes:
+      - gitlab-config:/etc/gitlab      # GitLab 설정 파일
+      - gitlab-logs:/var/log/gitlab    # 로그 파일
+      - gitlab-data:/var/opt/gitlab    # Git 저장소 및 데이터
+    
+    # 공유 메모리 크기 (GitLab 안정성을 위해 필요)
+    shm_size: '256m'
+    
+    # 헬스체크 설정
+    healthcheck:
+      test: ["CMD", "/opt/gitlab/bin/gitlab-healthcheck", "--fail"]
+      interval: 60s
+      timeout: 30s
+      retries: 5
+      start_period: 300s  # 초기 시작 시간 (5분)
+
+# 네트워크 정의
+# 사용 전 네트워크를 먼저 생성해야 합니다:
+# docker network create --driver bridge --subnet 172.30.0.0/16 gitlab-net
+networks:
+  gitlab-net:
+    external: true
+    name: gitlab-net
+
+# 볼륨 정의
+volumes:
+  gitlab-config:
+    name: gitlab-config
+  gitlab-logs:
+    name: gitlab-logs
+  gitlab-data:
+    name: gitlab-data
