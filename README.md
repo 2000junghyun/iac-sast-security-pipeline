@@ -24,6 +24,33 @@ It supports:
   - `github.com/xuri/excelize/v2` for Excel generation
 - **Environment**: single binary HTTP server, Docker-ready
 
+## API Documentation
+
+Interactive API documentation is available via **Swagger UI**:
+
+- **Local**: http://localhost:8080/swagger/
+- **Docker**: http://iac-scanner:8080/swagger/
+
+The OpenAPI specification file is located at `docs/openapi.yaml`.
+
+### Available Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+|--------|----------|-------------|---------------|
+| GET | `/` | Service information | No |
+| GET | `/health` | Health check | No |
+| GET | `/swagger/` | API Documentation (Swagger UI) | No |
+| POST | `/api/scan` | Trigger security scan | Yes (X-API-Secret) |
+| GET | `/api/scan-results` | Download Excel report | No |
+| POST | `/api/download-link` | Post MR comment with download link | Yes (X-API-Secret) |
+
+### Using Swagger UI
+
+1. Navigate to http://localhost:8080/swagger/
+2. Click "Authorize" button
+3. Enter your API secret (value of `WEBHOOK_SECRET` from `.env`)
+4. Try out the endpoints directly from the browser
+
 ## Directory Structure
 
 ```
