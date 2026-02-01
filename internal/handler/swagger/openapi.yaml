@@ -1,0 +1,431 @@
+openapi: 3.0.3
+info:
+  title: IaC Security Scanner API
+  description: |
+    Infrastructure as Code (IaC) Security Scanner API for GitLab integration.
+    This API provides endpoints for scanning Terraform files, downloading scan results,
+    and posting comments to GitLab Merge Requests.
+  version: 1.0.0
+  contact:
+    name: IaC Scanner Team
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+  - url: http://iac-scanner:8080
+    description: Docker container (internal network)
+
+tags:
+  - name: Health
+    description: Service health and status endpoints
+  - name: Scan
+    description: Security scanning operations
+  - name: Results
+    description: Scan results retrieval
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /:
+    get:
+      summary: Service Information
+      description: Returns basic service information and status
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Service is running
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: trivy-tf-scanner
+                  version:
+                    type: string
+                    example: 1.0.0
+                  status:
+                    type: string
+                    example: running
+
+  /health:
+    get:
+      summary: Health Check
+      description: Returns service health status
+      tags:
+        - Health
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  service:
+                    type: string
+                    example: trivy-tf-scanner
+
+  /api/scan:
+    post:
+      summary: Trigger Security Scan
+      description: |
+        Triggers a security scan for specified Terraform files in a GitLab Merge Request.
+        The scan process:
+        1. Downloads Terraform files from GitLab repository
+        2. Runs Trivy security scanner with custom policies
+        3. Generates Excel report with findings
+        4. Posts scan results as a comment on the MR
+      tags:
+        - Scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+            examples:
+              basic:
+                summary: Basic scan request
+                value:
+                  project_id: 1
+                  project_path: group01/test-project
+                  mr_iid: 1
+                  source_branch: feature-branch
+                  mr_title: Add S3 bucket configuration
+                  file_paths:
+                    - main.tf
+                    - variables.tf
+                  is_public: false
+              multiple_files:
+                summary: Scan multiple files
+                value:
+                  project_id: 2
+                  project_path: infrastructure/terraform
+                  mr_iid: 42
+                  source_branch: feat/update-vpc
+                  mr_title: Update VPC configuration
+                  file_paths:
+                    - vpc/main.tf
+                    - vpc/subnets.tf
+                    - security-groups/main.tf
+                  is_public: false
+      responses:
+        '200':
+          description: Scan completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+              examples:
+                success:
+                  summary: Successful scan
+                  value:
+                    status: completed
+                    message: Processed 2/2 files
+                    project_id: 1
+                    mr_iid: 1
+                    files_total: 2
+                    files_success: 2
+                    files_failed: 0
+                    failed_files: []
+                partial_failure:
+                  summary: Partial failure
+                  value:
+                    status: completed
+                    message: Processed 1/2 files
+                    project_id: 1
+                    mr_iid: 1
+                    files_total: 2
+                    files_success: 1
+                    files_failed: 1
+                    failed_files:
+                      - invalid.tf
+        '400':
+          description: Bad request - missing or invalid fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "missing required fields: project_id, mr_iid, file_paths"
+        '401':
+          description: Unauthorized - invalid or missing API secret
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: unauthorized
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: failed to process scan request
+
+  /api/scan-results:
+    get:
+      summary: Download Scan Results
+      description: |
+        Downloads the Excel file containing scan results for a specific MR.
+        The Excel file includes:
+        - Summary of findings (Critical, High, Medium, Low)
+        - Detailed vulnerability information
+        - Remediation recommendations
+      tags:
+        - Results
+      security: []
+      parameters:
+        - name: project
+          in: query
+          required: true
+          description: Project name (last part of project path)
+          schema:
+            type: string
+            example: test-project
+        - name: mr
+          in: query
+          required: true
+          description: Merge Request IID
+          schema:
+            type: integer
+            example: 1
+      responses:
+        '200':
+          description: Excel file download
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+          headers:
+            Content-Disposition:
+              description: Attachment filename
+              schema:
+                type: string
+                example: attachment; filename="test-project_#1.xlsx"
+        '404':
+          description: Scan results not found
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: scan results not found
+
+  /api/download-link:
+    post:
+      summary: Post Download Link Comment
+      description: |
+        Posts a comment to the GitLab MR with a download link to the scan results.
+        This is typically called by the CI/CD pipeline after uploading artifacts.
+      tags:
+        - Results
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DownloadLinkRequest'
+            example:
+              project_path: group01/test-project
+              mr_iid: 1
+              artifacts_url: http://local-gitlab/group01/test-project/-/jobs/123/artifacts/file/test-project_%231.xlsx
+              file_name: test-project_#1.xlsx
+      responses:
+        '200':
+          description: Comment posted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadLinkResponse'
+              example:
+                status: success
+                message: Download link comment posted successfully
+                project_path: group01/test-project
+                mr_iid: 1
+        '400':
+          description: Bad request - missing required fields
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: missing required fields
+        '401':
+          description: Unauthorized - invalid or missing API secret
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: unauthorized
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: error
+                  message:
+                    type: string
+                    example: failed to post comment
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Secret
+      description: |
+        API Secret for authentication. Must match the WEBHOOK_SECRET environment variable.
+        Example: change-this-to-secure-secret
+
+  schemas:
+    ScanRequest:
+      type: object
+      required:
+        - project_id
+        - project_path
+        - mr_iid
+        - source_branch
+        - mr_title
+        - file_paths
+      properties:
+        project_id:
+          type: integer
+          description: GitLab project ID
+          example: 1
+        project_path:
+          type: string
+          description: GitLab project path (group/project)
+          example: group01/test-project
+        mr_iid:
+          type: integer
+          description: Merge Request IID (internal ID)
+          example: 1
+        source_branch:
+          type: string
+          description: Source branch name
+          example: feature-branch
+        mr_title:
+          type: string
+          description: Merge Request title
+          example: Add S3 bucket configuration
+        file_paths:
+          type: array
+          description: List of Terraform file paths to scan
+          items:
+            type: string
+          example:
+            - main.tf
+            - variables.tf
+        is_public:
+          type: boolean
+          description: Whether the repository is public
+          default: false
+          example: false
+
+    ScanResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Scan completion status
+          example: completed
+        message:
+          type: string
+          description: Human-readable status message
+          example: Processed 2/2 files
+        project_id:
+          type: integer
+          description: GitLab project ID
+          example: 1
+        mr_iid:
+          type: integer
+          description: Merge Request IID
+          example: 1
+        files_total:
+          type: integer
+          description: Total number of files to scan
+          example: 2
+        files_success:
+          type: integer
+          description: Number of files successfully scanned
+          example: 2
+        files_failed:
+          type: integer
+          description: Number of files that failed to scan
+          example: 0
+        failed_files:
+          type: array
+          description: List of files that failed to scan
+          items:
+            type: string
+          example: []
+
+    DownloadLinkRequest:
+      type: object
+      required:
+        - project_path
+        - mr_iid
+        - artifacts_url
+        - file_name
+      properties:
+        project_path:
+          type: string
+          description: GitLab project path (group/project)
+          example: group01/test-project
+        mr_iid:
+          type: integer
+          description: Merge Request IID
+          example: 1
+        artifacts_url:
+          type: string
+          description: URL to the artifacts file in GitLab
+          example: http://local-gitlab/group01/test-project/-/jobs/123/artifacts/file/test-project_%231.xlsx
+        file_name:
+          type: string
+          description: Name of the Excel file
+          example: test-project_#1.xlsx
+
+    DownloadLinkResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          description: Operation status
+          example: success
+        message:
+          type: string
+          description: Human-readable status message
+          example: Download link comment posted successfully
+        project_path:
+          type: string
+          description: GitLab project path
+          example: group01/test-project
+        mr_iid:
+          type: integer
+          description: Merge Request IID
+          example: 1
