@@ -97,6 +97,11 @@ func registerHandlers(cfg *config.Config, gitlabClient *gitlab.Client, scannerIn
 	)
 	http.Handle("/api/download-link", downloadLinkHandler)
 	log.Println("✓ Download link handler registered: POST /api/download-link")
+
+	// Swagger UI 핸들러
+	swaggerHandler := handler.NewSwaggerHandler()
+	http.Handle("/swagger/", swaggerHandler)
+	log.Println("✓ Swagger UI handler registered: GET /swagger/")
 	log.Println()
 }
 
@@ -124,6 +129,7 @@ func logEndpoints() {
 	log.Println("Available endpoints:")
 	log.Println("  GET  /                  - Service info")
 	log.Println("  GET  /health            - Health check")
+	log.Println("  GET  /swagger/          - API Documentation (Swagger UI)")
 	log.Println("  POST /api/scan          - Security scan")
 	log.Println("  GET  /api/scan-results  - Download scan results (Excel)")
 	log.Println("  POST /api/download-link - Post download link comment")
