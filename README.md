@@ -13,6 +13,12 @@ It supports:
 - **GitLab integration**: posts formatted scan results as MR comments
 - **Excel export**: generates downloadable Excel reports for scan results
 
+Pipeline video:
+
+https://github.com/user-attachments/assets/bba7d94d-bee4-475c-8311-f9ddef5a6a16
+
+
+
 ## Tech Stack
 
 - **Language**: Go 1.21+ (see `go.mod`)
